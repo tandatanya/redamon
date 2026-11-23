@@ -772,6 +772,13 @@ docker compose up -d
 
 Once the override file exists, all `docker compose` commands automatically use dev mode with Next.js hot-reload -- no `-f` flags needed. To switch back to production mode: `rm docker-compose.override.yml`
 
+Two other ways to enter dev mode:
+
+- `./redamon.sh up dev` — starts the stack with `-f docker-compose.yml -f docker-compose.dev.yml` and host-clamps every CPU cap.
+- Pass the overlay explicitly: `docker compose -f docker-compose.yml -f docker-compose.dev.yml up -d`.
+
+A raw `docker compose -f ... -f docker-compose.dev.yml up` does **not** go through `redamon.sh`, so the host-CPU clamp never runs. The dev overlay therefore caps the sandbox itself (`kali-sandbox.cpus: ${KALI_DEV_CPUS:-2}`) and stays under an 8-CPU host's limit; raise it with `KALI_DEV_CPUS=4` (or more) if your scanning workload needs it.
+
 - **First run with GVM**: feed sync takes **~30 minutes**. All other services are ready immediately.
 - Access the webapp at **http://localhost:3000**.
 - Create a user account.

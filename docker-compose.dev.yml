@@ -25,7 +25,15 @@ services:
       - sh
       - -c
       - |
-        npm install || exit 1
+        # Reinstalling on every `up` costs ~30s. Skip it when the manifest and
+        # lockfile are older than the last successful install; a dependency edit
+        # makes them newer again and triggers a reinstall.
+        if [ ! -f node_modules/.dev-deps-stamp ] \
+          || [ package-lock.json -nt node_modules/.dev-deps-stamp ] \
+          || [ package.json -nt node_modules/.dev-deps-stamp ]; then
+          npm install || exit 1
+          touch node_modules/.dev-deps-stamp
+        fi
         node scripts/migrate-trufflehog-profiles.mjs || exit 1
         node scripts/add-js-recon-trufflehog-column.mjs || exit 1
         node scripts/db-push-locked.mjs db push --accept-data-loss || exit 1
