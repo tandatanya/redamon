@@ -45,6 +45,11 @@ services:
       interval: 10s
       timeout: 5s
       retries: 5
+      # initdb on a fresh volume easily exceeds the 5x10s retry window, so without
+      # a start grace the container flips to "unhealthy" and `up -d` aborts its
+      # dependents ("dependency failed to start") even though it is healthy
+      # seconds later. The grace only covers first boot; normal checks follow.
+      start_period: 60s
     networks:
       - redamon
 
@@ -88,7 +93,10 @@ services:
       interval: 15s
       timeout: 10s
       retries: 10
-      start_period: 30s
+      # Neo4j's first-boot startup (log/plugin setup) can still miss the 30s
+      # window on a cold volume and flip to "unhealthy", aborting its dependents
+      # in `up -d`. Give it the same first-boot grace as Postgres.
+      start_period: 60s
     networks:
       - redamon
       # Also on the orchestrator's isolated net so the clean half of the
