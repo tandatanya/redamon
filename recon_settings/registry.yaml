@@ -2582,7 +2582,7 @@ fields:
     group: llm
     meaning: >-
       Engine for the FFuf extension picker: false uses the LLM in aiPipelineModel,
-      true uses TypeSafe AI Jev (model jev-1.13.0). Takes effect only when
+      true uses TypeSafe AI Jev (model jev-latest). Takes effect only when
       aiInPipeline is true, and aiInPipeline does not reset it. Needs a Jev provider
       selected for the project (jevProviderId); without one the hook uses its static
       fallback. Jev picks only from a fixed 40-extension catalog.
@@ -2687,7 +2687,7 @@ fields:
     mcp: settable
     group: llm
     meaning: >-
-      Picks the smart-fuzz base paths with TypeSafe AI Jev (model jev-1.13.0):
+      Picks the smart-fuzz base paths with TypeSafe AI Jev (model jev-latest):
       false keeps the random pick that fills ffufSmartFuzzMaxBasePaths, true asks
       Jev, per discovered directory, whether it is likely to hold sensitive,
       administrative or application content, and FFuf fuzzes the directories Jev
@@ -3895,7 +3895,7 @@ fields:
     mcp: settable
     group: llm
     meaning: >-
-      Orders Hakrawler's seed URLs with TypeSafe AI Jev (model jev-1.13.0): false
+      Orders Hakrawler's seed URLs with TypeSafe AI Jev (model jev-latest): false
       keeps the alphabetical order, true asks Jev, per probed host, whether it is
       likely to have a rich web application surface, and Hakrawler crawls the
       promising hosts first, so under hakrawlerMaxUrls they are reached before
@@ -4108,7 +4108,7 @@ fields:
     mcp: settable
     group: llm
     meaning: >-
-      Labels each probed URL with TypeSafe AI Jev (model jev-1.13.0): false
+      Labels each probed URL with TypeSafe AI Jev (model jev-latest): false
       labels nothing, true asks Jev whether a page is a login wall, a parked
       domain, a default install page, a placeholder or an error page, and calls
       it an app otherwise. A deterministic pre-filter supplies the label for any
@@ -6436,7 +6436,7 @@ fields:
     group: llm
     meaning: >-
       Engine for the Nuclei tag selector: false uses the LLM in aiPipelineModel,
-      true uses TypeSafe AI Jev (model jev-1.13.0). Takes effect only when
+      true uses TypeSafe AI Jev (model jev-latest). Takes effect only when
       aiInPipeline is true, and aiInPipeline does not reset it. Needs a Jev provider
       selected for the project (jevProviderId); without one the hook uses its static
       fallback.
@@ -7411,7 +7411,7 @@ fields:
     mcp: settable
     group: llm
     meaning: >-
-      Asks TypeSafe AI Jev (model jev-1.13.0) about a collection tool's empty
+      Asks TypeSafe AI Jev (model jev-latest) about a collection tool's empty
       result whose error output the deterministic checks cannot place: false
       asks nothing, true asks whether it describes a transient failure that a
       second run could fix. The deterministic checks always run and record such
@@ -8421,7 +8421,7 @@ fields:
     mcp: settable
     group: llm
     meaning: >-
-      Ranks the route exposure scan's routes with TypeSafe AI Jev (model jev-1.13.0):
+      Ranks the route exposure scan's routes with TypeSafe AI Jev (model jev-latest):
       false keeps the deterministic budget order (floor first, then the prior score),
       true asks Jev, per route, whether it is meant only for logged-in, internal or
       administrative callers, and its answer fills the budget after the floor: the
@@ -8442,7 +8442,7 @@ fields:
     mcp: settable
     group: llm
     meaning: >-
-      Asks TypeSafe AI Jev (model jev-1.13.0) whether an HTML page the route exposure
+      Asks TypeSafe AI Jev (model jev-latest) whether an HTML page the route exposure
       scan kept as a lead is really a login form, an error page or a placeholder
       that the deterministic page check could not place: false keeps the
       deterministic verdict only, true saves Jev's page class on the lead
@@ -8462,7 +8462,7 @@ fields:
     mcp: settable
     group: llm
     meaning: >-
-      Assesses each route exposure lead with TypeSafe AI Jev (model jev-1.13.0):
+      Assesses each route exposure lead with TypeSafe AI Jev (model jev-latest):
       false keeps the deterministic route class only, true asks Jev which kind of
       route it is and how sensitive what it returns is, from the evidence alone (the
       statuses, content class, masked key names and closed hints, never the route
@@ -9149,7 +9149,7 @@ fields:
     group: llm
     meaning: >-
       Assesses the serialized-object candidates with TypeSafe AI Jev (model
-      jev-1.13.0): false leaves them as the deterministic signatures flagged
+      jev-latest): false leaves them as the deterministic signatures flagged
       them, true asks Jev, per distinct blob, which serialization format it is
       and how likely it is to be an attacker-reachable sink, writes both onto
       the candidate (deser_jev_format, deser_jev_exploitability) and orders the
@@ -9887,7 +9887,7 @@ fields:
     group: llm
     meaning: >-
       Engine for the takeover disambiguator: false uses the LLM in aiPipelineModel,
-      true uses TypeSafe AI Jev (model jev-1.13.0). Takes effect only when
+      true uses TypeSafe AI Jev (model jev-latest). Takes effect only when
       aiInPipeline is true, and aiInPipeline does not reset it. Needs a Jev provider
       selected for the project (jevProviderId); without one the hook uses its static
       fallback.
@@ -10942,7 +10942,7 @@ fields:
     group: llm
     meaning: >-
       Engine for the WAF classifier: false uses the LLM in aiPipelineModel, true
-      uses TypeSafe AI Jev (model jev-1.13.0). Takes effect only when aiInPipeline
+      uses TypeSafe AI Jev (model jev-latest). Takes effect only when aiInPipeline
       is true, and aiInPipeline does not reset it. Needs a Jev provider selected for
       the project (jevProviderId); without one the hook uses its static fallback.
     form_section: "SecurityChecksSection"
