@@ -2,6 +2,7 @@
 
 import { memo, useRef } from 'react'
 import { GraphData, GraphNode } from '../../types'
+import { isWebGLAvailable } from '../../utils/webgl'
 import { GraphCanvas2D } from './GraphCanvas2D'
 import { GraphCanvas3D } from './GraphCanvas3D'
 import { GraphNavControls } from './GraphNavControls'
@@ -54,7 +55,12 @@ export const GraphCanvas = memo(function GraphCanvas({
 
   // Auto-switch to 2D for large graphs
   const nodeCount = data?.nodes.length ?? 0
-  const effective3D = is3D && nodeCount <= AUTO_2D_THRESHOLD
+  // A browser without WebGL cannot mount the 3D renderer at all: three.js
+  // throws and the route dies. The preference stays untouched, so the 3D view
+  // comes back on a machine that can render it.
+  const webgl = isWebGLAvailable()
+  const wants3D = is3D && nodeCount <= AUTO_2D_THRESHOLD
+  const effective3D = wants3D && webgl
 
   if (isLoading) {
     return <div className={styles.loading}>Loading graph data...</div>
@@ -94,6 +100,11 @@ export const GraphCanvas = memo(function GraphCanvas({
 
   return (
     <div className={styles.wrapper}>
+      {wants3D && !webgl && (
+        <div className={styles.notice} role="status">
+          3D view needs WebGL, which this browser could not provide — showing 2D.
+        </div>
+      )}
       <GraphCanvas2D
         data={data}
         width={width}
