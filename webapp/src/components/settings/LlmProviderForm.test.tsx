@@ -359,7 +359,7 @@ describe('LlmProviderForm Jev branch', () => {
     name: 'TypeSafe AI (Jev)',
     apiKey: '••••••••abcd',
     baseUrl: '',
-    modelIdentifier: 'jev-1.13.0',
+    modelIdentifier: 'jev-latest',
   }
 
   test('the generic type picker never lists Jev', () => {
@@ -377,7 +377,7 @@ describe('LlmProviderForm Jev branch', () => {
     expect(screen.queryByText('Choose Provider Type')).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Change type' })).not.toBeInTheDocument()
     expect(screen.getByPlaceholderText('apikey_...')).toBeInTheDocument()
-    expect(screen.getByTestId('jev-model')).toHaveTextContent('jev-1.13.0')
+    expect(screen.getByTestId('jev-model')).toHaveTextContent('jev-latest')
     expect(screen.getByRole('textbox', { name: 'Display Name' })).toBeInTheDocument()
     expect(screen.getByRole('combobox', { name: 'Jev backend' })).toBeEnabled()
     expect(screen.getByRole('combobox', { name: 'Jev backend' })).toHaveClass('select')
@@ -490,7 +490,7 @@ describe('LlmProviderForm inside another <form>', () => {
     render(<LlmProviderForm userId="user-1" lockedType="jev" onSave={vi.fn()} onCancel={vi.fn()} />)
     expect(screen.getByText(/Add TypeSafe AI \(Jev\) Provider/)).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Cancel' })).toBeInTheDocument()
-    expect(screen.getByTestId('jev-model')).toHaveTextContent('jev-1.13.0')
+    expect(screen.getByTestId('jev-model')).toHaveTextContent('jev-latest')
   })
 })
 

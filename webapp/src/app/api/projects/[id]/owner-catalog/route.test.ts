@@ -57,7 +57,7 @@ const PROVIDERS = [
   { id: 'prov-bedrock', userId: OWNER, providerType: 'bedrock', name: 'AWS', apiKey: '', baseUrl: '', modelIdentifier: '', defaultHeaders: {},
     awsRegion: 'eu-west-1', awsAccessKeyId: 'AKIA-rbac-fake-id', awsSecretKey: 'rbac-fake-aws-secret', awsBearerToken: '', createdAt: CREATED(3) },
   { id: 'prov-jev', userId: OWNER, providerType: 'jev', name: 'TypeSafe AI (Jev)', apiKey: 'rbac-fake-jev-token', baseUrl: 'https://api.typesafe.ai',
-    modelIdentifier: 'jev-1.13.0', defaultHeaders: {}, awsRegion: 'us-east-1', awsAccessKeyId: '', awsSecretKey: '', awsBearerToken: '', createdAt: CREATED(4) },
+    modelIdentifier: 'jev-latest', defaultHeaders: {}, awsRegion: 'us-east-1', awsAccessKeyId: '', awsSecretKey: '', awsBearerToken: '', createdAt: CREATED(4) },
   { id: 'prov-jev-or', userId: OWNER, providerType: 'jev_openrouter', name: 'OpenRouter (Jev)', apiKey: '', baseUrl: 'https://openrouter.ai/api/v1',
     modelIdentifier: 'typesafe/jev-1.13', defaultHeaders: {}, awsRegion: 'us-east-1', awsAccessKeyId: '', awsSecretKey: '', awsBearerToken: '', createdAt: CREATED(5) },
 ]

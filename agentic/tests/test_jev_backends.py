@@ -185,10 +185,15 @@ def test_openrouter_splits_questions_when_the_shared_state_is_large():
     assert all(json.loads(req.content)["state"] == state for req in seen)
 
 
-@pytest.mark.parametrize("model,ok", [("jev-1.13.0", True), ("jev-1.13.0-20261001", True),
-                                      ("jev-1.14.0", False), ("jev-1.13.0-free", False),
-                                      ("", False), (None, False)])
-def test_direct_typesafe_accepts_only_the_pinned_version(model, ok):
+@pytest.mark.parametrize("model,ok", [("jev-latest", True), ("jev-1.13.0", True),
+                                      ("jev-1.13.0-20261001", True), ("jev-1.14.0", True),
+                                      ("jev-1.13.0-free", False),
+                                      ("", False), (None, False), ("gpt-5", False),
+                                      ("typesafe/jev-1.13", False), ("jev-", False)])
+def test_direct_typesafe_accepts_the_alias_or_a_jev_version(model, ok):
+    """The alias is what is sent and the backend answers with the version it served
+    (`jev-latest` -> `jev-1.14.0`), so the answer is checked against the aliases and
+    the Jev version/snapshot names, never a single pin. Anything else is refused."""
     direct = jc.JevProvider("jev", "synthetic-direct-key")
     with transport(lambda req: answer(req, model), []):
         if ok:
@@ -364,8 +369,24 @@ def test_no_request_field_can_turn_the_provider_test_into_a_billed_call(client, 
     assert all(req.method == "GET" for req in seen)
 
 
-def test_direct_free_proof_requires_the_pinned_model(client):
-    with patch.object(jc, "list_models", AsyncMock(return_value=["jev-latest"])), \
+def test_direct_free_proof_accepts_the_alias_catalog(client):
+    """REGRESSION (upstream catalog drift): TypeSafe's /v1/models publishes the Jev
+    family by alias (jev-latest / jev-preview) and lists no versioned names. The free
+    check demanded the version it had pinned IN THE LISTING, so every real catalog
+    answered 400 "unexpected answer" on Check Key. The listing now proves the key and
+    the family; system_one still refuses an answer that is not a Jev model."""
+    with patch.object(jc, "list_models", AsyncMock(return_value=["jev-latest", "jev-preview"])), \
+         patch.object(jc, "system_one", AsyncMock()) as inference:
+        response = post_test(client, providerType="jev")
+    assert response.status_code == 200 and response.json()["success"] is True
+    assert response.json()["model"] == jc.JEV_MODEL
+    inference.assert_not_called()
+
+
+def test_direct_free_proof_still_refuses_a_catalog_without_jev(client):
+    """The relaxed proof is a family check, not a rubber stamp: a catalog with no Jev
+    entry is still a bad answer."""
+    with patch.object(jc, "list_models", AsyncMock(return_value=["gpt-4o", "claude-opus"])), \
          patch.object(jc, "system_one", AsyncMock()) as inference:
         response = post_test(client, providerType="jev")
     assert response.status_code == 400 and response.json()["success"] is False

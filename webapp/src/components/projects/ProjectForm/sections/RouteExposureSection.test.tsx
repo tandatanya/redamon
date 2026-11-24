@@ -169,7 +169,7 @@ describe('RouteExposureSection Jev rows', () => {
   function stubJevProvider() {
     vi.stubGlobal('fetch', vi.fn(async () => ({
       ok: true, status: 200,
-      json: async () => [{ id: 'j', name: 'Selected direct Jev', providerType: 'jev', apiKey: '••••c0de', modelIdentifier: 'jev-1.13.0' }],
+      json: async () => [{ id: 'j', name: 'Selected direct Jev', providerType: 'jev', apiKey: '••••c0de', modelIdentifier: 'jev-latest' }],
     })))
   }
 

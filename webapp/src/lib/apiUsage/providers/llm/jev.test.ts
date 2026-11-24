@@ -11,7 +11,7 @@ const KEY = 'apikey_' + '0'.repeat(36) + '_' + 'f'.repeat(64)
 
 const MODELS = { models: [{ name: 'jev-latest', description: 'x' }, { name: 'jev-preview', description: 'y' }] }
 const PING_OK = {
-  model: 'jev-1.13.0',
+  model: 'jev-latest',
   answers: { ping: { type: 'noul', noul: 0.67 } },
   usage: { input_tokens: 272, output_tokens: 20 },
 }
@@ -33,7 +33,7 @@ describe('requests', () => {
     expect(r.url).toBe('https://api.typesafe.ai/v1/systemone')
     expect(r.url).not.toContain(KEY)
     const body = JSON.parse(r.body!)
-    expect(body.model).toBe('jev-1.13.0')
+    expect(body.model).toBe('jev-latest')
     expect(Object.values(body.questions)).toEqual([{ type: 'noul', instructions: 'Is this a ping?' }])
   })
 })

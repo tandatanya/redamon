@@ -10,7 +10,7 @@ vi.mock('@/components/settings/LlmProviderForm', () => ({
     <button type="button" onClick={onSave}>Save account configuration for {userId}</button>,
 }))
 
-const DIRECT = { id: 'direct', name: 'Synthetic direct', providerType: 'jev', apiKey: 'masked', modelIdentifier: 'jev-1.13.0' }
+const DIRECT = { id: 'direct', name: 'Synthetic direct', providerType: 'jev', apiKey: 'masked', modelIdentifier: 'jev-latest' }
 const ROUTER = { ...DIRECT, id: 'router', name: 'Synthetic routed', providerType: 'jev_openrouter', modelIdentifier: 'typesafe/jev-1.13' }
 let rows: unknown
 let responseStatus: number
@@ -51,7 +51,7 @@ describe('project Jev provider picker', () => {
     expect(screen.getByText('Not selected')).toBeInTheDocument()
     expect(screen.getByText(/No Jev provider is selected for this project/)).toHaveTextContent('scan start is not blocked')
     expect(screen.getByRole('button', { name: 'Jev' })).toBeDisabled()
-    expect(screen.getByRole('option', { name: /Synthetic direct · TypeSafe · jev-1.13.0/ })).toBeInTheDocument()
+    expect(screen.getByRole('option', { name: /Synthetic direct · TypeSafe · jev-latest/ })).toBeInTheDocument()
     expect(screen.getByRole('option', { name: /Synthetic routed · OpenRouter · typesafe\/jev-1.13/ })).toBeInTheDocument()
   })
 

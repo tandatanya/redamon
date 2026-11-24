@@ -83,7 +83,7 @@ describe('a model it cannot use opens the picker', () => {
     // is a valid `custom/<id>`. The row here carries a base URL so that only the chat-provider
     // filter, not the empty-URL branch, can stop the token being posted to it.
     const JEV = { id: 'jev-row', providerType: 'jev', apiKey: 'apikey_secret_jev_token_value',
-                  modelIdentifier: 'jev-1.13.0', baseUrl: 'http://tokens.example/v1', timeout: 30,
+                  modelIdentifier: 'jev-latest', baseUrl: 'http://tokens.example/v1', timeout: 30,
                   maxTokens: 4096, temperature: 0 }
     mockProviders.mockResolvedValue([ANTHROPIC, JEV])
     saved('custom/jev-row')

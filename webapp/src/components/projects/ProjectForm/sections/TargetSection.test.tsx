@@ -318,7 +318,7 @@ describe('the AI in Pipeline panel', () => {
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => ({
       ok: true, status: 200,
-      json: async () => url.includes('llm-providers') ? [{ id: 'j', name: 'Synthetic Jev', providerType: 'jev', apiKey: '••••c0de', modelIdentifier: 'jev-1.13.0' }] : {},
+      json: async () => url.includes('llm-providers') ? [{ id: 'j', name: 'Synthetic Jev', providerType: 'jev', apiKey: '••••c0de', modelIdentifier: 'jev-latest' }] : {},
     })))
   })
   afterEach(() => vi.unstubAllGlobals())
@@ -442,7 +442,7 @@ describe('target modes: AI in Pipeline everywhere, Domain Verification never on 
   beforeEach(() => {
     vi.stubGlobal('fetch', vi.fn(async (url: string) => ({
       ok: true, status: 200,
-      json: async () => url.includes('llm-providers') ? [{ id: 'j', name: 'Synthetic Jev', providerType: 'jev', apiKey: '••••c0de', modelIdentifier: 'jev-1.13.0' }] : {},
+      json: async () => url.includes('llm-providers') ? [{ id: 'j', name: 'Synthetic Jev', providerType: 'jev', apiKey: '••••c0de', modelIdentifier: 'jev-latest' }] : {},
     })))
   })
   afterEach(() => vi.unstubAllGlobals())

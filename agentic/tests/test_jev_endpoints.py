@@ -193,7 +193,7 @@ def test_nuclei_success_returns_tags_and_never_leaks_the_key(client):
     answers = {"tag_0": {"type": "noul", "noul": 0.9}, "tag_1": {"type": "noul", "noul": 0.9},
                "tag_2": {"type": "noul", "noul": 0.1}}
     with _owner_ok(), _providers([JEV_ROW]), \
-            patch("jev_client.system_one", AsyncMock(return_value={"model": "jev-1.13.0", "answers": answers})) as s1:
+            patch("jev_client.system_one", AsyncMock(return_value={"model": "jev-latest", "answers": answers})) as s1:
         resp = _post(client, "/jev/nuclei-tags", NUCLEI_BODY)
     assert resp.status_code == 200
     assert "cve" in resp.json()["tags"]
@@ -222,7 +222,7 @@ def test_waf_success_shape(client):
                "vendor": {"type": "choice", "choice": "cloudflare", "confidence": 0.9,
                           "probabilities": {"cloudflare": 1.0}}}
     with _owner_ok(), _providers([JEV_ROW]), \
-            patch("jev_client.system_one", AsyncMock(return_value={"model": "jev-1.13.0", "answers": answers})):
+            patch("jev_client.system_one", AsyncMock(return_value={"model": "jev-latest", "answers": answers})):
         resp = _post(client, "/jev/waf-classify", WAF_BODY)
     assert resp.status_code == 200
     assert resp.json() == {"waf_detected": True, "waf_type": "cloudflare", "confidence": 90,
@@ -233,12 +233,12 @@ def test_serialized_success_shape(client):
     answers = {"format": {"type": "choice", "choice": "native_java", "confidence": 0.87},
                "exploitable": {"type": "noul", "noul": 0.62}}
     with _owner_ok(), _providers([JEV_ROW]), \
-            patch("jev_client.system_one", AsyncMock(return_value={"model": "jev-1.13.0", "answers": answers})):
+            patch("jev_client.system_one", AsyncMock(return_value={"model": "jev-latest", "answers": answers})):
         resp = _post(client, "/jev/serialized-classify", SERIALIZED_BODY)
     assert resp.status_code == 200
     assert resp.json() == {"labels": [{"format": "native_java", "format_confidence": 87,
                                        "exploitability": 62}],
-                           "model": "jev-1.13.0"}
+                           "model": "jev-latest"}
     assert CANARY not in resp.text
 
 
@@ -340,7 +340,7 @@ def _valid_answers(req):
                              "confidence": 0.9, "probabilities": {}}
         else:
             answers[name] = {"type": "noul", "noul": 0.9}
-    return httpx.Response(200, json={"model": "jev-1.13.0", "answers": answers, "usage": {}})
+    return httpx.Response(200, json={"model": "jev-latest", "answers": answers, "usage": {}})
 
 
 def _bare_key(req) -> str:
@@ -429,7 +429,7 @@ def test_an_unexpected_error_inside_a_hook_is_a_fixed_503_logged_by_class_only(c
 
 def _noul_answers_for(req):
     body = _json.loads(req.content)
-    return httpx.Response(200, json={"model": "jev-1.13.0", "usage": {}, "answers": {
+    return httpx.Response(200, json={"model": "jev-latest", "usage": {}, "answers": {
         name: {"type": "noul", "noul": 0.8} for name in body["questions"]}})
 
 
@@ -481,7 +481,7 @@ def test_ffuf_base_paths_success_shape(client):
         resp = _post(client, "/jev/ffuf-base-paths", BASE_PATHS_BODY)
     assert resp.status_code == 200, resp.text
     assert resp.json() == {"ranked": ["admin", "api/v1"], "scores": [0.8, 0.8, 0.8],
-                           "model": "jev-1.13.0"}
+                           "model": "jev-latest"}
 
 
 def test_page_type_success_shape(client):
@@ -489,32 +489,32 @@ def test_page_type_success_shape(client):
         resp = _post(client, "/jev/page-type", PAGE_TYPE_BODY)
     assert resp.status_code == 200, resp.text
     assert resp.json() == {"labels": [{"page_class": "login_only", "confidence": 80}],
-                           "model": "jev-1.13.0"}
+                           "model": "jev-latest"}
 
 
 def test_tool_health_success_shape(client):
     with _owner_ok(), _providers([JEV_ROW]), _mock_typesafe(_noul_answers_for):
         resp = _post(client, "/jev/tool-health", TOOL_HEALTH_BODY)
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"transient": True, "confidence": 80, "model": "jev-1.13.0"}
+    assert resp.json() == {"transient": True, "confidence": 80, "model": "jev-latest"}
 
 
 def test_route_privacy_rank_success_shape(client):
     with _owner_ok(), _providers([JEV_ROW]), _mock_typesafe(_noul_answers_for):
         resp = _post(client, "/jev/route-privacy-rank", ROUTE_PRIVACY_BODY)
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"scores": [0.8, 0.8], "model": "jev-1.13.0"}
+    assert resp.json() == {"scores": [0.8, 0.8], "model": "jev-latest"}
 
 
 def test_route_exposure_assess_success_shape(client):
     answers = {"kind": {"type": "choice", "choice": "data_export", "confidence": 0.83},
                "sensitive": {"type": "noul", "noul": 0.91}}
     with _owner_ok(), _providers([JEV_ROW]), \
-            patch("jev_client.system_one", AsyncMock(return_value={"model": "jev-1.13.0", "answers": answers})):
+            patch("jev_client.system_one", AsyncMock(return_value={"model": "jev-latest", "answers": answers})):
         resp = _post(client, "/jev/route-exposure-assess", ROUTE_ASSESS_BODY)
     assert resp.status_code == 200, resp.text
     assert resp.json() == {"labels": [{"kind": "data_export", "kind_confidence": 83, "sensitivity": 91}],
-                           "model": "jev-1.13.0"}
+                           "model": "jev-latest"}
     assert CANARY not in resp.text
 
 
@@ -522,7 +522,7 @@ def test_crawl_seed_order_success_shape(client):
     with _owner_ok(), _providers([JEV_ROW]), _mock_typesafe(_noul_answers_for):
         resp = _post(client, "/jev/crawl-seed-order", CRAWL_SEED_BODY)
     assert resp.status_code == 200, resp.text
-    assert resp.json() == {"scores": [0.8, 0.8], "model": "jev-1.13.0"}
+    assert resp.json() == {"scores": [0.8, 0.8], "model": "jev-latest"}
 
 
 @pytest.mark.parametrize("path,questions", [
@@ -538,7 +538,7 @@ def test_the_per_item_log_line_counts_the_questions_asked(client, caplog, path, 
     with _owner_ok(), _providers([JEV_ROW]), _mock_typesafe(answers):
         _post(client, path, PATHS[path])
     lines = [r.getMessage() for r in caplog.records if r.getMessage().startswith("jev ")]
-    assert any(f" questions={questions} model=jev-1.13.0 " in ln and ln.endswith(" ok") for ln in lines), lines
+    assert any(f" questions={questions} model=jev-latest " in ln and ln.endswith(" ok") for ln in lines), lines
 
 
 def test_a_jev_answer_out_of_range_fails_the_per_item_hook_closed(client):
@@ -549,7 +549,7 @@ def test_a_jev_answer_out_of_range_fails_the_per_item_hook_closed(client):
         names = list(body["questions"])
         answers = {n: {"type": "noul", "noul": 0.5} for n in names}
         answers[names[-1]] = {"type": "noul", "noul": 1.5}
-        return httpx.Response(200, json={"model": "jev-1.13.0", "answers": answers})
+        return httpx.Response(200, json={"model": "jev-latest", "answers": answers})
 
     for path in ("/jev/ffuf-base-paths", "/jev/page-type", "/jev/crawl-seed-order", "/jev/tool-health"):
         with _owner_ok(), _providers([JEV_ROW]), _mock_typesafe(nan_answers):

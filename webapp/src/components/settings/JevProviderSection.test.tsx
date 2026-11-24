@@ -17,7 +17,7 @@ vi.mock('./LlmProviderForm', () => ({
 
 afterEach(cleanup)
 const rows = [
-  { id: 'direct', name: 'Direct staging', providerType: 'jev', apiKey: '••••abcd', modelIdentifier: 'jev-1.13.0' },
+  { id: 'direct', name: 'Direct staging', providerType: 'jev', apiKey: '••••abcd', modelIdentifier: 'jev-latest' },
   { id: 'router', name: 'OpenRouter staging', providerType: 'jev_openrouter', apiKey: '••••efgh', modelIdentifier: 'typesafe/jev-1.13' },
 ] as ProviderData[]
 const props = () => ({

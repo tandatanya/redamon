@@ -298,7 +298,7 @@ describe('POST /api/users/[id]/llm-providers - TypeSafe Jev', () => {
     expect(mockCreate.mock.calls[0][0].data).toMatchObject({
       name: 'Second entry', providerType,
       baseUrl: providerType === 'jev' ? 'https://api.typesafe.ai' : 'https://openrouter.ai/api/v1',
-      modelIdentifier: providerType === 'jev' ? 'jev-1.13.0' : 'typesafe/jev-1.13',
+      modelIdentifier: providerType === 'jev' ? 'jev-latest' : 'typesafe/jev-1.13',
       defaultHeaders: {}, timeout: 5, sslVerify: true,
     })
   })
@@ -310,7 +310,7 @@ describe('POST /api/users/[id]/llm-providers - TypeSafe Jev', () => {
     const data = mockCreate.mock.calls[0][0].data
     expect(data).toMatchObject({
       userId: 'victim', providerType: 'jev', name: 'whatever', apiKey: 'apikey_abc_def',
-      baseUrl: 'https://api.typesafe.ai', modelIdentifier: 'jev-1.13.0', defaultHeaders: {}, timeout: 5, sslVerify: true,
+      baseUrl: 'https://api.typesafe.ai', modelIdentifier: 'jev-latest', defaultHeaders: {}, timeout: 5, sslVerify: true,
     })
   })
 

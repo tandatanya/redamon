@@ -74,7 +74,7 @@ def test_status_maps_to_one_error_type(status, error_type):
     body = {"detail": {"error_type": "x", "message": f"echo {KEY}"}}
     with _transport(_json(status, body)):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(KEY, "jev-1.13.0", "s", NOUL_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", NOUL_Q))
     assert err.value.error_type == error_type
     assert str(err.value) == jev_client.ERROR_MESSAGES[error_type]
     assert KEY not in str(err.value)
@@ -83,14 +83,14 @@ def test_status_maps_to_one_error_type(status, error_type):
 def test_rate_limit_carries_retry_after():
     with _transport(_json(429, {}, headers={"retry-after": "7"})):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(KEY, "jev-1.13.0", "s", NOUL_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", NOUL_Q))
     assert err.value.retry_after == 7.0
 
 
 def test_rate_limit_with_a_junk_retry_after_has_none():
     with _transport(_json(429, {}, headers={"retry-after": "soon"})):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(KEY, "jev-1.13.0", "s", NOUL_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", NOUL_Q))
     assert err.value.retry_after is None
 
 
@@ -104,7 +104,7 @@ def test_transport_failures_are_timeouts_and_drop_the_exception_text(exc):
         raise exc
     with _transport(boom):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(KEY, "jev-1.13.0", "s", NOUL_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", NOUL_Q))
     assert err.value.error_type == "jev_timeout"
     assert KEY not in str(err.value)
     assert err.value.__cause__ is None and err.value.__suppress_context__
@@ -113,7 +113,7 @@ def test_transport_failures_are_timeouts_and_drop_the_exception_text(exc):
 def test_a_non_json_2xx_is_a_bad_response():
     with _transport(lambda req: httpx.Response(200, text="<html>")):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(KEY, "jev-1.13.0", "s", NOUL_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", NOUL_Q))
     assert err.value.error_type == "jev_bad_response"
 
 
@@ -128,12 +128,12 @@ def test_an_unknown_error_type_is_coerced_to_a_known_one():
 def test_the_request_goes_to_the_constant_base_url_with_the_key_as_bearer():
     seen: list = []
     with _transport(_ok({"q": {"type": "noul", "noul": 0.9}}), seen):
-        _run(jev_client.system_one(KEY, "jev-1.13.0", {"server": "nginx"}, NOUL_Q))
+        _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, {"server": "nginx"}, NOUL_Q))
     (req,) = seen
     assert str(req.url) == "https://api.typesafe.ai/v1/systemone"
     assert req.method == "POST"
     assert req.headers["authorization"] == f"Bearer {KEY}"
-    assert json.loads(req.content) == {"model": "jev-1.13.0", "state": {"server": "nginx"},
+    assert json.loads(req.content) == {"model": jev_client.JEV_MODEL, "state": {"server": "nginx"},
                                        "questions": NOUL_Q}
 
 
@@ -142,12 +142,16 @@ def test_a_redirect_is_not_followed():
     redirect = lambda req: httpx.Response(302, headers={"location": "https://evil.example/"})  # noqa: E731
     with _transport(redirect, seen):
         with pytest.raises(JevError):
-            _run(jev_client.system_one(KEY, "jev-1.13.0", "s", NOUL_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", NOUL_Q))
     assert len(seen) == 1
 
 
-@pytest.mark.parametrize("model", ["jev-latest", "jev-preview", "jev-1.14.0", "gpt-4o", "jev-1.13", "../x", "", None])
-def test_a_model_that_is_not_a_pinned_version_is_refused_before_any_request(model):
+@pytest.mark.parametrize("model", ["jev-1.13.0", "jev-preview", "jev-1.14.0", "gpt-4o",
+                                   "jev-1.13", "../x", "", None])
+def test_the_caller_must_name_the_canonical_model(model):
+    """`system_one`'s model argument names the one model the hooks ask for (JEV_MODEL,
+    the alias); anything else -- the old version pin included -- is refused before any
+    request. The WIRE model is provider.wire_model and never comes from here."""
     seen: list = []
     with _transport(_ok({}), seen):
         with pytest.raises(JevError) as err:
@@ -161,7 +165,7 @@ def test_a_malformed_key_is_refused_before_any_request(key):
     seen: list = []
     with _transport(_ok({}), seen):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(key, "jev-1.13.0", "s", NOUL_Q))
+            _run(jev_client.system_one(key, jev_client.JEV_MODEL, "s", NOUL_Q))
     assert err.value.error_type == "jev_auth"
     assert seen == []
 
@@ -169,13 +173,13 @@ def test_a_malformed_key_is_refused_before_any_request(key):
 def test_a_state_that_is_not_json_is_a_bad_request():
     with _transport(_ok({})):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(KEY, "jev-1.13.0", {"x": object()}, NOUL_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, {"x": object()}, NOUL_Q))
     assert err.value.error_type == "jev_bad_request"
 
 
 def test_no_questions_is_a_bad_request():
     with pytest.raises(JevError) as err:
-        _run(jev_client.system_one(KEY, "jev-1.13.0", "s", {}))
+        _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", {}))
     assert err.value.error_type == "jev_bad_request"
 
 
@@ -185,7 +189,7 @@ def test_no_questions_is_a_bad_request():
 
 def test_valid_answers_are_returned_with_the_model_version():
     with _transport(_ok({"q": {"type": "noul", "noul": 0.25}, "extra": {"type": "noul", "noul": 1}})):
-        out = _run(jev_client.system_one(KEY, "jev-1.13.0", "s", NOUL_Q))
+        out = _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", NOUL_Q))
     assert out == {"model": "jev-1.13.0", "answers": {"q": {"type": "noul", "noul": 0.25}}}
 
 
@@ -202,7 +206,7 @@ def test_valid_answers_are_returned_with_the_model_version():
 def test_a_bad_noul_answer_fails_the_call(answers):
     with _transport(_ok(answers)):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(KEY, "jev-1.13.0", "s", NOUL_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", NOUL_Q))
     assert err.value.error_type == "jev_bad_response"
 
 
@@ -211,7 +215,7 @@ def test_a_choice_outside_its_own_options_fails_the_call():
                          "probabilities": {"evilcorp": 1.0}}}
     with _transport(_ok(answer)):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(KEY, "jev-1.13.0", "s", CHOICE_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", CHOICE_Q))
     assert err.value.error_type == "jev_bad_response"
 
 
@@ -219,14 +223,14 @@ def test_a_valid_choice_passes():
     answer = {"vendor": {"type": "choice", "choice": "akamai", "confidence": 0.8,
                          "probabilities": {"akamai": 0.9, "cloudflare": 0.1}}}
     with _transport(_ok(answer)):
-        out = _run(jev_client.system_one(KEY, "jev-1.13.0", "s", CHOICE_Q))
+        out = _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", CHOICE_Q))
     assert out["answers"]["vendor"]["choice"] == "akamai"
 
 
 def test_answers_not_a_map_fail_the_call():
     with _transport(_json(200, {"model": "jev-1.13.0", "answers": []})):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(KEY, "jev-1.13.0", "s", NOUL_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", NOUL_Q))
     assert err.value.error_type == "jev_bad_response"
 
 
@@ -322,7 +326,7 @@ def test_provider_test_lists_models_and_never_builds_a_chat_model(client):
         resp = _post_test(client, baseUrl="http://evil.example")
     assert resp.status_code == 200
     assert resp.json()["success"] is True
-    assert resp.json()["model"] == "jev-1.13.0"
+    assert resp.json()["model"] == jev_client.JEV_MODEL
     lm.assert_awaited_once_with(KEY)
     setup.assert_not_called()
 
@@ -352,7 +356,7 @@ def test_an_unhashable_choice_is_a_bad_response_not_a_crash(choice):
     answer = {"vendor": {"type": "choice", "choice": choice, "confidence": 0.9, "probabilities": {}}}
     with _transport(_ok(answer)):
         with pytest.raises(JevError) as err:
-            _run(jev_client.system_one(KEY, "jev-1.13.0", "s", CHOICE_Q))
+            _run(jev_client.system_one(KEY, jev_client.JEV_MODEL, "s", CHOICE_Q))
     assert err.value.error_type == "jev_bad_response"
 
 

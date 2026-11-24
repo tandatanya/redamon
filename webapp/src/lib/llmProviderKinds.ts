@@ -21,11 +21,13 @@ export const isChatProvider = (p: { providerType: string }): boolean =>
   !NON_CHAT_PROVIDER_TYPES.has(p.providerType)
 
 /**
- * The Jev version every saved Jev row is pinned to. The recon hook thresholds
- * are calibrated against it, so moving on is a deliberate edit here and in
- * agentic/jev_client.py (JEV_MODEL), never an alias drift.
+ * The Jev model every saved Jev row is pinned to. TypeSafe publishes its model
+ * family by ALIAS (`jev-latest`), and a versioned name is only listed while it
+ * is current, so the alias is what the transport asks for; `system_one` accepts
+ * whatever Jev version the backend resolves it to. This must stay a twin of
+ * `JEV_MODEL` in agentic/jev_client.py.
  */
-export const JEV_MODEL = 'jev-1.13.0'
+export const JEV_MODEL = 'jev-latest'
 export const JEV_PROVIDER_NAME = 'TypeSafe AI (Jev)'
 export const JEV_OPENROUTER_MODEL = 'typesafe/jev-1.13'
 

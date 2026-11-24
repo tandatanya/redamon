@@ -3,7 +3,7 @@ import { describe, test, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, waitFor, cleanup, act } from '@testing-library/react'
 import { JevSelectionProvider, useHasJevProvider, useJevProvider, notifyJevProviderChanged } from './useHasJevProvider'
 
-const direct = { id: 'direct', name: 'Lab direct', providerType: 'jev', apiKey: 'masked', modelIdentifier: 'jev-1.13.0' }
+const direct = { id: 'direct', name: 'Lab direct', providerType: 'jev', apiKey: 'masked', modelIdentifier: 'jev-latest' }
 const router = { ...direct, id: 'router', name: 'Lab routed', providerType: 'jev_openrouter', modelIdentifier: 'typesafe/jev-1.13' }
 const response = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status })
 let fetchMock: ReturnType<typeof vi.fn>

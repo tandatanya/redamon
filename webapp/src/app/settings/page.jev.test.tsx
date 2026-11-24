@@ -37,7 +37,7 @@ const SettingsPage = (await import('./page')).default
 const CHAT = { id: 'p1', userId: 'user-1', providerType: 'anthropic', name: 'My Anthropic', apiKey: '••••1234' }
 const JEV = {
   id: 'jev1', userId: 'user-1', providerType: 'jev', name: 'TypeSafe AI (Jev)',
-  apiKey: '••••••••c0de', modelIdentifier: 'jev-1.13.0', baseUrl: '',
+  apiKey: '••••••••c0de', modelIdentifier: 'jev-latest', baseUrl: '',
 }
 
 let providersAnswer: () => Promise<{ status: number; body: unknown }>

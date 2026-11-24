@@ -11,7 +11,8 @@ below the static fallback. Target-derived bytes go into the `state` as data
 (wrapped), never concatenated into an instruction; a per-item hook names an item
 by its index, never by quoting it.
 
-Question wording is versioned with the pinned model: a prompt change is a
+Question wording is tuned against the Jev model family (measured on jev-1.13.0,
+which the jev-latest alias has since moved past): a prompt change is a
 deliberate edit alongside JEV_MODEL.
 """
 from __future__ import annotations
@@ -436,8 +437,9 @@ async def page_type(key: jev_client.JevProvider | str, pages: list) -> dict:
     One request per page, sequential and all-or-nothing, with five nouls about
     "the page in the state". Not batched by index like the other per-item hooks:
     measured live on jev-1.13.0, a login page in a request with other pages scored
-    0.55 for login_only and 0.92 alone. A page's state has a dozen fields, and the
-    answers blur across items.
+    0.55 for login_only and 0.92 alone (the transport rides the jev-latest alias
+    now, so these numbers move when TypeSafe promotes a version). A page's state
+    has a dozen fields, and the answers blur across items.
 
     A page takes the class with the highest noul at or above PAGE_CLASS_THRESHOLD
     (ties go to the earlier class), else "app". Confidence is in the label taken:
@@ -611,10 +613,12 @@ async def serialized_classify(key: jev_client.JevProvider | str, blobs: list) ->
 
     One request per blob, sequential and all-or-nothing, like `page_type`:
     measured live on jev-1.13.0, per-item answers blur when several items share
-    one state. Two questions per blob: which format it is (a choice over the
-    closed set, carrying its own confidence) and whether it is likely an
-    attacker-reachable deserialization sink (a noul). Recon only annotates and
-    ranks with these; it never drops a candidate or rewrites its format.
+    one state (the transport rides the jev-latest alias now, so these move when
+    TypeSafe promotes a version). Two questions per blob: which format it is (a
+    choice over the closed set, carrying its own confidence) and whether it is
+    likely an attacker-reachable deserialization sink (a noul). Recon only
+    annotates and ranks with these; it never drops a candidate or rewrites its
+    format.
     """
     questions = {
         "format": {

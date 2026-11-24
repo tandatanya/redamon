@@ -160,7 +160,7 @@ describe('DELETE provider — ownership', () => {
 })
 
 describe('PUT provider - TypeSafe Jev type lock', () => {
-  const JEV_ROW = { ...PROVIDER, providerType: 'jev', apiKey: 'apikey_stored_key', baseUrl: '', modelIdentifier: 'jev-1.13.0' }
+  const JEV_ROW = { ...PROVIDER, providerType: 'jev', apiKey: 'apikey_stored_key', baseUrl: '', modelIdentifier: 'jev-latest' }
 
   test('a stored Jev row cannot become a chat provider', async () => {
     mockRequireUserAccess.mockResolvedValue(null)
@@ -192,7 +192,7 @@ describe('PUT provider - TypeSafe Jev type lock', () => {
       params('victim', 'p1'),
     )
     expect(res.status).toBe(200)
-    expect(mockUpdate.mock.calls[0][0].data).toMatchObject({ apiKey: 'apikey_new_key', name: 'renamed', baseUrl: 'https://api.typesafe.ai', defaultHeaders: {}, modelIdentifier: 'jev-1.13.0', timeout: 5, sslVerify: true })
+    expect(mockUpdate.mock.calls[0][0].data).toMatchObject({ apiKey: 'apikey_new_key', name: 'renamed', baseUrl: 'https://api.typesafe.ai', defaultHeaders: {}, modelIdentifier: 'jev-latest', timeout: 5, sslVerify: true })
   })
 
   test('a masked key keeps the stored one', async () => {

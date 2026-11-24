@@ -26,8 +26,14 @@ import httpx
 logger = logging.getLogger(__name__)
 
 BASE_URL = "https://api.typesafe.ai"
-# Recon thresholds are calibrated against this version, never a drifting alias.
-JEV_MODEL = "jev-1.13.0"
+# TypeSafe publishes its model family by alias (`jev-latest`, `jev-preview`) and
+# no longer lists versioned names in `/v1/models`, while a versioned name still
+# serves only until it is retired. So the direct transport asks for the ALIAS:
+# the catalog listing keeps working, and `system_one` accepts whatever Jev
+# version the backend resolves it to (see `_DIRECT_MODEL_RE`). Recon's hook
+# thresholds were measured on jev-1.13.0 and are applied to whatever the alias
+# serves, so they may drift between versions.
+JEV_MODEL = "jev-latest"
 OPENROUTER_BASE_URL = "https://openrouter.ai/api"
 OPENROUTER_MODEL = "typesafe/jev-1.13"
 #: OpenRouter runs a request above about 32,000 bytes of text in TypeSafe's
@@ -37,10 +43,12 @@ OPENROUTER_MODEL = "typesafe/jev-1.13"
 #: that cannot fit on its own is refused.
 OPENROUTER_BODY_LIMIT = 32_000
 #: Both backends answer with the version they served, optionally as a dated
-#: snapshot (OpenRouter documents `typesafe/jev-1.13-20260917`). Any other
-#: version means the calibration no longer holds, so the answer is refused.
+#: snapshot (OpenRouter documents `typesafe/jev-1.13-20260917`). The direct alias
+#: resolves to a versioned name (`jev-latest` -> `jev-1.14.0`), so the direct
+#: check accepts the aliases and the Jev version/snapshot names it may resolve
+#: to -- any other model name is refused.
 _OPENROUTER_MODEL_RE = re.compile(r"typesafe/jev-1\.13(?:-\d{8})?")
-_DIRECT_MODEL_RE = re.compile(r"jev-1\.13\.0(?:-\d{8})?")
+_DIRECT_MODEL_RE = re.compile(r"jev-(?:latest|preview|\d+\.\d+\.\d+(?:-\d{8})?)")
 
 
 @dataclass(frozen=True)
@@ -336,18 +344,24 @@ def resolve_provider(providers: list, selected_id: str, owner_id: str) -> JevPro
 
 
 async def test_provider(provider: JevProvider) -> dict:
-    """A free check of the key and the pinned model. Spends no credit.
+    """A free check of the key and the Jev catalog. Spends no credit.
 
     Authentication plus catalog metadata does not prove the account can pay for
-    a decision call, so the result never claims that.
+    a decision call, so the result never claims that. The listing is not proof of
+    the served version either: `/v1/models` publishes the family by alias
+    (`jev-latest`, `jev-preview`) and the alias resolves to a version only when a
+    request runs. So this proves the key and that the Jev family is published;
+    `system_one` still refuses an answer that is not a Jev model.
     """
     if provider.provider_type == "jev":
         models = await list_models(provider.api_key)
-        if JEV_MODEL not in models:
+        if not any(isinstance(name, str) and name.startswith("jev-") for name in models):
             raise JevError("jev_bad_response")
         return {"success": True, "model": JEV_MODEL,
-                "proof": "key_and_model_listing", "billed": False,
-                "response_text": "TypeSafe accepted the key and lists Jev 1.13.0; inference not tested (free)."}
+                "proof": "key_and_model_family", "billed": False,
+                "response_text": "TypeSafe accepted the key and publishes the Jev models; "
+                                 "Jev is queried through the jev-latest alias, so inference "
+                                 "was not tested (free)."}
     key_data = await _request("GET", "/v1/key", provider)
     if not isinstance(key_data, dict) or not isinstance(key_data.get("data"), dict):
         raise JevError("jev_bad_response")

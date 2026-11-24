@@ -43,7 +43,7 @@ beforeEach(() => {
   fetchMock.mockReset().mockImplementation(async (url: string) => {
     if (url.endsWith('/llm-providers')) return json([
       { id: 'chat', providerType: 'openai', name: 'Synthetic chat', apiKey: 'masked', modelIdentifier: 'gpt-4o' },
-      { id: 'direct', providerType: 'jev', name: 'Synthetic direct', apiKey: 'masked', modelIdentifier: 'jev-1.13.0' },
+      { id: 'direct', providerType: 'jev', name: 'Synthetic direct', apiKey: 'masked', modelIdentifier: 'jev-latest' },
     ])
     if (url === '/api/projects/defaults') return json({ jevProviderId: 'must-not-inherit' })
     if (url.endsWith('/settings')) return json({})

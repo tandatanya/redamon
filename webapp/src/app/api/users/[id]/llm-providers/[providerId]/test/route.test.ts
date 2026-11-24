@@ -298,7 +298,7 @@ describe('regression: 180s route cap overrides the provider\'s own timeout', () 
 describe('POST llm-providers/[providerId]/test - TypeSafe Jev lock', () => {
   const JEV_ROW = {
     id: 'jev1', userId: 'u1', providerType: 'jev', apiKey: 'apikey_stored_key',
-    baseUrl: '', modelIdentifier: 'jev-1.13.0', defaultHeaders: {},
+    baseUrl: '', modelIdentifier: 'jev-latest', defaultHeaders: {},
   }
   const sentToAgent = () => JSON.parse(fetchMock.mock.calls[0][1].body as string)
 
@@ -312,7 +312,7 @@ describe('POST llm-providers/[providerId]/test - TypeSafe Jev lock', () => {
     mockFindFirst.mockResolvedValue({ ...JEV_ROW, providerType, baseUrl: 'https://legacy-evil.example' })
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }))
     await POST(post({ baseUrl: 'https://evil.example', modelIdentifier: 'chat', defaultHeaders: { leak: 'yes' }, timeout: 1000, sslVerify: false, apiKey: '••••••••_key' }), params('u1', 'jev1'))
-    expect(sentToAgent()).toMatchObject({ providerType, apiKey: 'apikey_stored_key', baseUrl: providerType === 'jev' ? 'https://api.typesafe.ai' : 'https://openrouter.ai/api/v1', modelIdentifier: providerType === 'jev' ? 'jev-1.13.0' : 'typesafe/jev-1.13', defaultHeaders: {}, timeout: 5, sslVerify: true })
+    expect(sentToAgent()).toMatchObject({ providerType, apiKey: 'apikey_stored_key', baseUrl: providerType === 'jev' ? 'https://api.typesafe.ai' : 'https://openrouter.ai/api/v1', modelIdentifier: providerType === 'jev' ? 'jev-latest' : 'typesafe/jev-1.13', defaultHeaders: {}, timeout: 5, sslVerify: true })
   })
   test.each(['jev', 'jev_openrouter'])('unsaved %s tests pin transport', async providerType => {
     fetchMock.mockResolvedValue(new Response(JSON.stringify({ success: true }), { status: 200 }))
