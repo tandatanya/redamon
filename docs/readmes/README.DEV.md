@@ -795,6 +795,57 @@ docker compose logs webapp --tail=5   # Should show "Ready in X ms"
 docker compose logs agent --tail=5    # Should show "Uvicorn running on 0.0.0.0:8080"
 ```
 
+### 5.2.1 From dev to production on the same box
+
+Hot-reload is for development. Running the dev overlay as the real deployment
+means Next.js compiles every page on request: the dev webapp sits at **~3.5 GB
+RSS and ~100% of a core** even at rest, and that pressure is what starves scans
+on a 16 GB machine.
+
+To serve the built image instead:
+
+```bash
+# 1. Build the production webapp once (npm ci + next build; 5-10 min, needs ~4 GB)
+REDAMON_VERSION="$(cat VERSION)" docker compose -f docker-compose.yml build webapp
+
+# 2. Start the stack WITHOUT the dev overlay
+./redamon.sh up
+```
+
+The differences that follow from that:
+
+| | dev overlay | production |
+| --- | --- | --- |
+| Webapp process | `next dev --turbopack`, compiles on request | `node server.js` from `.next/standalone` |
+| RSS / CPU at rest | ~3.5 GB / ~1 core | ~300-500 MB / ~idle |
+| Editing `webapp/src/**` | save, reload | `docker compose build webapp && docker compose up -d webapp` |
+| Source mounts | `./webapp` | baked into the image |
+| Everything else (agent, recon, MCP, plugins) | identical | identical |
+
+Pin the machine's budget in `.env` so the stack does not try to use the whole
+box (a desktop session or an IDE needs the rest):
+
+```bash
+REDAMON_HOST_RAM_MB=14336    # 14 GB of 16
+REDAMON_HOST_CPUS=6          # 6 of 8 cores
+```
+
+Both are read by `redamon.sh` before it sizes anything; the resulting memory and
+CPU ceilings are written into the `.env` block, so they hold even for a bare
+`docker compose up`. How the split is computed is in
+[README.MEMORY_GOVERNOR.md §9.3](README.MEMORY_GOVERNOR.md#93-declaring-a-host-budget-a-shared-machine).
+
+Verify what the stack will actually be allowed to use:
+
+```bash
+docker compose --profile plugins --profile capture config | \
+  python3 -c 'import sys,yaml; d=yaml.safe_load(sys.stdin); s=d["services"]; \
+  print(sum(float(v.get("cpus") or 0) for v in s.values()), "cpus total")'
+```
+
+Remember that a `cpus:` value is a per-container ceiling, so the sum above is
+the ceiling of the whole stack, not a reservation.
+
 ### 5.3 Hot-Reload vs Rebuild
 
 This is the most important table for day-to-day development. It tells you exactly what to do after changing any file:
