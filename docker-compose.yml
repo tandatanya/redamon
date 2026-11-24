@@ -196,6 +196,7 @@ services:
     image: registry.community.greenbone.net/community/redis-server:stable
     container_name: redamon-gvm-redis
     mem_limit: ${GVM_REDIS_MEM:-1g}   # sized from host RAM by redamon.sh (holds the whole VT feed; routinely multi-GB)
+    cpus: ${GVM_REDIS_CPUS:-1}        # share of REDAMON_HOST_CPUS when a budget is declared
     restart: on-failure
     volumes:
       - gvm_redis_socket:/run/redis/
@@ -204,6 +205,7 @@ services:
     image: registry.community.greenbone.net/community/pg-gvm:stable
     container_name: redamon-gvm-postgres
     mem_limit: ${GVM_POSTGRES_MEM:-1g}   # sized from host RAM by redamon.sh (GVM's own database)
+    cpus: ${GVM_POSTGRES_CPUS:-1}        # share of REDAMON_HOST_CPUS when a budget is declared
     restart: on-failure
     # The stale-lock cleanup runs INSIDE this container, right before postgres
     # starts. It used to be a sibling one-shot sharing the socket volume, which
@@ -235,6 +237,7 @@ services:
     image: registry.community.greenbone.net/community/gvmd:stable
     container_name: redamon-gvm-gvmd
     mem_limit: ${GVMD_MEM:-3g}              # sized from host RAM by redamon.sh (gvm profile)
+    cpus: ${GVMD_CPUS:-2}                   # share of REDAMON_HOST_CPUS when a budget is declared
     restart: on-failure
     volumes:
       - gvmd_data:/var/lib/gvm
@@ -264,6 +267,7 @@ services:
     image: registry.community.greenbone.net/community/ospd-openvas:stable
     container_name: redamon-gvm-ospd
     mem_limit: ${GVM_OSPD_MEM:-2g}   # sized from host RAM by redamon.sh (the actual OpenVAS scanner: heaviest of the stack)
+    cpus: ${GVM_OSPD_CPUS:-4}        # share of REDAMON_HOST_CPUS when a budget is declared
     restart: on-failure
     hostname: ospd-openvas.local
     cap_add:
@@ -692,6 +696,10 @@ services:
       # traffic-ingest at 256m on a 31.7 GB host, verified live.
       CAPTURE_PROXY_MEM: ${CAPTURE_PROXY_MEM:-}
       TRAFFIC_INGEST_MEM: ${TRAFFIC_INGEST_MEM:-}
+      # CPU shares of a declared REDAMON_HOST_CPUS budget (the same orchestrator
+      # spawns this pair, so the compose `cpus:` values never apply to it).
+      CAPTURE_PROXY_CPUS: ${CAPTURE_PROXY_CPUS:-}
+      TRAFFIC_INGEST_CPUS: ${TRAFFIC_INGEST_CPUS:-}
       CODEFIX_SANDBOX_MEM: ${CODEFIX_SANDBOX_MEM:-}
       RECON_JOB_ENVELOPE_MEM: ${RECON_JOB_ENVELOPE_MEM:-}
       RESOURCE_PROFILE_PATH: ${RESOURCE_PROFILE_PATH:-}
@@ -1411,6 +1419,7 @@ services:
     # Docker/AppArmor hosts (see container_manager.py). setuid/setgid bits are
     # stripped in the image instead (capture_proxy/Dockerfile).
     mem_limit: ${CAPTURE_PROXY_MEM:-384m}   # sized from host RAM by redamon.sh
+    cpus: ${CAPTURE_PROXY_CPUS:-2}          # share of REDAMON_HOST_CPUS when a budget is declared
     pids_limit: 256
     restart: "no"
 
@@ -1467,6 +1476,7 @@ services:
     # Docker/AppArmor hosts (see container_manager.py). setuid/setgid bits are
     # stripped in the image instead (capture_proxy/Dockerfile).
     mem_limit: ${TRAFFIC_INGEST_MEM:-256m}  # sized from host RAM by redamon.sh
+    cpus: ${TRAFFIC_INGEST_CPUS:-1}         # share of REDAMON_HOST_CPUS when a budget is declared
     pids_limit: 256
     depends_on:
       postgres:
@@ -1551,6 +1561,7 @@ services:
     cap_drop: [ALL]
     # NOTE: no `no-new-privileges` here, for the same reason as plugin-runner.
     mem_limit: 128m
+    cpus: ${PLUGIN_GATEWAY_CPUS:-1}         # share of REDAMON_HOST_CPUS when a budget is declared
     pids_limit: 64
     healthcheck:
       test: ["CMD", "python", "-m", "gateway_proxy.healthcheck"]

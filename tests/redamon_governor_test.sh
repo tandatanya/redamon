@@ -39,7 +39,7 @@ eq "garbage -> empty"  "$(_size_to_mb abc)"       ""
 echo "== preflight_ram_gate =="
 # Stub detected RAM.
 STUB_MEM=0
-detect_build_resources() { BUILD_MEM_MB="$STUB_MEM"; BUILD_RES_SOURCE="stub"; BUILD_NCPU=4; }
+detect_build_resources() { BUILD_MEM_MB="$STUB_MEM"; BUILD_RES_SOURCE="stub"; BUILD_NCPU=4; _apply_host_budget; }
 
 STUB_MEM=4096; unset REDAMON_MIN_RAM_MB REDAMON_SKIP_RAM_GATE SERVICE_BASELINE_MEM OS_HEADROOM_MEM
 preflight_ram_gate; eq "4GB host fails default 8GB gate" "$?" "1"
@@ -500,7 +500,7 @@ CPU_VARS=(POSTGRES_CPUS NEO4J_CPUS KALI_CPUS RECON_ORCHESTRATOR_CPUS AGENT_CPUS 
 CPU_TMP="$(mktemp -d)"; trap 'rm -rf "$CPU_TMP"' EXIT
 SCRIPT_DIR="$CPU_TMP"
 reset_cpu_stub() { unset "${CPU_VARS[@]}" BUILD_NCPU; STUB_NCPU="$1"; }
-detect_build_resources() { BUILD_MEM_MB="$STUB_MEM"; BUILD_RES_SOURCE="stub"; BUILD_NCPU="$STUB_NCPU"; }
+detect_build_resources() { BUILD_MEM_MB="$STUB_MEM"; BUILD_RES_SOURCE="stub"; BUILD_NCPU="$STUB_NCPU"; _apply_host_budget; }
 
 # The reported failure: a 4-vCPU VM. Every cap must land <= 4 or the daemon
 # rejects `up` with "range of CPUs is from 0.01 to 4.00".
@@ -544,6 +544,78 @@ rm -f "$CPU_TMP/.env"
 reset_cpu_stub 4; STUB_MEM=0; export_resource_caps
 eq "CPU clamp survives undetectable RAM" "$KALI_CPUS" "4"
 unset "${CPU_VARS[@]}"; STUB_MEM=32000
+
+echo "== declared host budget =="
+# A production box that must leave the machine headroom declares the budget once
+# and every derived limit is a percentage of it.
+BUILD_MEM_MB=15629; BUILD_NCPU=8; BUILD_RES_SOURCE="stub"
+REDAMON_HOST_RAM_MB=14336 REDAMON_HOST_CPUS=6 _apply_host_budget
+eq "budget lowers RAM"   "$BUILD_MEM_MB" "14336"
+eq "budget lowers cores" "$BUILD_NCPU"   "6"
+# A budget above the machine must never promise memory that is not there.
+BUILD_MEM_MB=8192; BUILD_NCPU=4
+REDAMON_HOST_RAM_MB=14336 REDAMON_HOST_CPUS=6 _apply_host_budget
+eq "a budget above the host is ignored (RAM)" "$BUILD_MEM_MB" "8192"
+eq "a budget above the host is ignored (CPU)" "$BUILD_NCPU"   "4"
+unset REDAMON_HOST_RAM_MB REDAMON_HOST_CPUS
+
+# A declared RAM budget stops the burst clamp from counting swap: a hard budget
+# must not be exceeded by paging.
+_swap_total_mb() { printf '%s' "16000"; }
+fresh_process; STUB_MEM=15629; REDAMON_HOST_RAM_MB=14336
+allocate_memory >/dev/null 2>&1
+eq "the budget also caps what the allocator sees" "$BUILD_MEM_MB" "14336"
+ceilings=0; for i in "${!_ALLOC_MB[@]}"; do [[ "${_ALLOC_TIERS[$i]}" != "t" ]] && ceilings=$(( ceilings + _ALLOC_MB[i] )); done
+if [[ "$ceilings" -le 14336 ]]; then
+    ok "ceiling sum stays inside the declared RAM budget (${ceilings} <= 14336)"
+else
+    bad "ceiling sum stays inside the declared RAM budget" "$ceilings" "<= 14336"
+fi
+unset REDAMON_HOST_RAM_MB
+_swap_total_mb() { printf '%s' "${STUB_SWAP_MB:-0}"; }
+
+echo "== declared CPU budget =="
+CPU_TMP2="$(mktemp -d)"; SCRIPT_DIR="$CPU_TMP2"
+CPU_ALL=(POSTGRES_CPUS NEO4J_CPUS KALI_CPUS RECON_ORCHESTRATOR_CPUS AGENT_CPUS \
+         WEBAPP_CPUS DOCKER_BROKER_CPUS PLUGIN_RUNNER_CPUS PLUGIN_GATEWAY_CPUS \
+         CAPTURE_PROXY_CPUS TRAFFIC_INGEST_CPUS GVMD_CPUS GVM_OSPD_CPUS \
+         GVM_REDIS_CPUS GVM_POSTGRES_CPUS)
+reset_cpu_budget() { unset "${CPU_ALL[@]}" REDAMON_HOST_CPUS; _MEM_SELF_EXPORTED=" "; }
+sum_cpus() { for v in "$@"; do [[ -n "${!v:-}" ]] && printf '%s\n' "${!v}"; done | awk '{s+=$1} END{printf "%.2f", s}'; }
+
+reset_cpu_budget; REDAMON_HOST_CPUS=6 export_cpu_caps
+eq "budget 6: NEO4J gets 6 x 200/1000"  "$NEO4J_CPUS" "1.20"
+eq "budget 6: AGENT gets 6 x 190/1000"  "$AGENT_CPUS" "1.14"
+eq "budget 6: caps sum to the budget" \
+   "$(sum_cpus "${CPU_ALL[@]:0:11}")" "6.00"
+gvm_set=0
+for v in GVMD_CPUS GVM_OSPD_CPUS GVM_REDIS_CPUS GVM_POSTGRES_CPUS; do [[ -n "${!v:-}" ]] && gvm_set=1; done
+eq "GVM caps are absent while the profile is off" "$gvm_set" "0"
+
+# GVM on: the four scanner services join the split, so each share SHRINKS and the
+# sum still equals the budget instead of over-committing the machine.
+reset_cpu_budget; WANT_GVM=1
+REDAMON_HOST_CPUS=6 export_cpu_caps
+eq "GVM on: OSPD joins the split" "$(awk '{printf "%.2f", $1}' <<<"$GVM_OSPD_CPUS")" "0.59"
+eq "GVM on: caps still sum to the budget" "$(sum_cpus "${CPU_ALL[@]}")" "6.00"
+WANT_GVM=0
+
+# Never 0.00: compose passes cpus as NanoCpus and 0 means UNLIMITED.
+reset_cpu_budget; REDAMON_HOST_CPUS=1 export_cpu_caps
+zeroes=0; for v in "${CPU_ALL[@]:0:11}"; do [[ "${!v}" == "0.00" ]] && zeroes=$(( zeroes + 1 )); done
+eq "a 1-core budget never yields 0.00 (unlimited)" "$zeroes" "0"
+
+# An operator pin wins over the split, in the shell and in .env alike.
+reset_cpu_budget; export NEO4J_CPUS=3.5; REDAMON_HOST_CPUS=6 export_cpu_caps
+eq "shell pin wins over the split" "$NEO4J_CPUS" "3.5"
+reset_cpu_budget; printf 'AGENT_CPUS=2\n' > "$SCRIPT_DIR/.env"
+REDAMON_HOST_CPUS=6 export_cpu_caps
+eq ".env pin left to compose" "${AGENT_CPUS:-unset}" "unset"
+eq ".env pin does not block the others" "$(awk '{printf "%.2f", $1}' <<<"$WEBAPP_CPUS")" "0.90"
+rm -f "$SCRIPT_DIR/.env"
+reset_cpu_budget
+SCRIPT_DIR="$_REAL_SCRIPT_DIR"
+rm -rf "$CPU_TMP2"
 
 echo "== setup_zram guards =="
 # Default off -> pure no-op (returns 0, does nothing).

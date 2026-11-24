@@ -231,6 +231,28 @@ detect_build_resources() {
     else
         BUILD_DISK_PATH="$SCRIPT_DIR"
     fi
+
+    _apply_host_budget
+}
+
+# A production host often shares the machine with something else (a desktop
+# session, an IDE, another stack) and must leave it headroom. REDAMON_HOST_RAM_MB
+# and REDAMON_HOST_CPUS declare that budget once; every derived limit (the
+# allocator, the RAM gate, build batching, the CPU split) is then a percentage of
+# the budget instead of the physical machine. They can only LOWER the detected
+# value: a budget above the real host would promise memory that is not there.
+# Read through _env_knob, so a shell prefix works as well as a .env entry.
+_apply_host_budget() {
+    local mb cpu
+    mb="$(_env_knob REDAMON_HOST_RAM_MB 2>/dev/null)"; mb="${mb//[^0-9]/}"
+    if [[ -n "$mb" && "$mb" -gt 0 && "$BUILD_MEM_MB" -gt 0 && "$mb" -lt "$BUILD_MEM_MB" ]]; then
+        BUILD_MEM_MB="$mb"
+        BUILD_RES_SOURCE="$BUILD_RES_SOURCE, budget ${mb}MB"
+    fi
+    cpu="$(_env_knob REDAMON_HOST_CPUS 2>/dev/null)"; cpu="${cpu//[^0-9]/}"
+    if [[ -n "$cpu" && "$cpu" -gt 0 && "$cpu" -lt "$BUILD_NCPU" ]]; then
+        BUILD_NCPU="$cpu"
+    fi
 }
 
 # Echo the chosen COMPOSE_PARALLEL_LIMIT. "0" means "leave unbounded".
@@ -551,6 +573,9 @@ _ALLOC_FLOORS=()
 _ALLOC_TIERS=()
 _ALLOC_WEIGHTS=()
 _ALLOC_OWNED=()
+# CPU caps this run computed from a declared budget. Kept apart from _ALLOC_OWNED
+# because allocate_memory resets that list, while these are exported before it.
+_CPU_OWNED=()
 _ALLOC_OS_MB=0
 _ALLOC_SERVICES_MB=0
 _ALLOC_SCAN_MB=0
@@ -616,6 +641,7 @@ _env_knob() {
 HOST_ONLY_ENV_KEYS=(
     OS_RESERVE_PCT SERVICES_PCT BURST_FACTOR BURST_SWAP_MIN_PCT BLAST_PCT
     REDAMON_WEIGHT_WEBAPP REDAMON_WEIGHT_NEO4J REDAMON_WEIGHT_AGENT
+    REDAMON_HOST_RAM_MB REDAMON_HOST_CPUS
     REDAMON_SKIP_RAM_GATE REDAMON_ENABLE_ZRAM
 )
 
@@ -812,6 +838,10 @@ allocate_memory() {
     local cushion max_burst
     local swap_mb; swap_mb="$(_swap_total_mb)"
     [[ "$swap_mb" =~ ^[0-9]+$ ]] || swap_mb=0   # never let an empty read poison the sum
+    # A DECLARED host budget is a hard budget: counting swap here would license
+    # ceilings that sum past the very cap the operator asked for, and the stack
+    # would quietly do it by paging. Budget = RAM only.
+    [[ -n "$(_env_knob REDAMON_HOST_RAM_MB)" ]] && swap_mb=0
     cushion=$(( total + swap_mb - os_mb - reserved_total ))
     if [[ "$burst_fair" -gt 0 && "$cushion" -gt 0 ]]; then
         max_burst=$(( cushion * 100 / burst_fair ))
@@ -919,8 +949,85 @@ _export_cpu_cap() {
 # `cpus:` is a limit, not a reservation, so clamping loses nothing: the core
 # count was already the real ceiling. Keep these defaults in sync with
 # docker-compose.yml and tooling/deploy/single-host/deploy.sh's cap_cpus block.
+# Per-mille shares of a DECLARED CPU budget (REDAMON_HOST_CPUS), summed so the
+# stack's ceilings add up to the budget instead of each container being capped at
+# the whole machine. Only used when a budget is declared; otherwise the clamp
+# above stays in force. GVM is a profile: its four long-running services join the
+# split only when it is enabled, exactly like the memory weights.
+_CPU_SPECS_BASE="NEO4J:200 POSTGRES:130 AGENT:190 WEBAPP:150 KALI:130 RECON_ORCHESTRATOR:60 DOCKER_BROKER:30 PLUGIN_RUNNER:50 PLUGIN_GATEWAY:10 CAPTURE_PROXY:30 TRAFFIC_INGEST:20"
+_CPU_SPEC_GVM="GVMD:60 GVM_OSPD:120 GVM_REDIS:20 GVM_POSTGRES:20"
+
+_cpu_specs() {
+    local specs="$_CPU_SPECS_BASE"
+    is_gvm_enabled 2>/dev/null && specs="$specs $_CPU_SPEC_GVM"
+    printf '%s' "$specs"
+}
+
+# Split REDAMON_HOST_CPUS by weight. Returns 1 when no budget is declared so the
+# caller can fall back to the per-container clamp. The shares are rational, so a
+# service can end up below a tenth of a core -- fine -- but never 0.00, which
+# compose passes to Docker as NanoCpus 0 = UNLIMITED.
+allocate_cpu_budget() {
+    local budget b100 spec name weight h v sum=0 total=0 plan="" pinned=0
+    local max_h=0 max_name="" n=0
+    budget="$(_env_knob REDAMON_HOST_CPUS)"; budget="${budget//[^0-9]/}"
+    [[ -n "$budget" && "$budget" -gt 0 ]] || return 1
+    b100=$(( budget * 100 ))
+    for spec in $(_cpu_specs); do
+        weight="${spec##*:}"; [[ "$weight" =~ ^[0-9]+$ ]] || weight=0
+        sum=$(( sum + weight )); n=$(( n + 1 ))
+    done
+    [[ "$sum" -le 0 ]] && sum=1
+    for spec in $(_cpu_specs); do
+        name="${spec%%:*}"; weight="${spec##*:}"
+        [[ "$weight" =~ ^[0-9]+$ ]] || weight=0
+        local var="${name}_CPUS"
+        # A pin (shell or .env, outside the managed block) wins. A value INSIDE
+        # the block is this script's own output from an earlier run, so it is
+        # recomputed -- otherwise a changed budget would never take effect.
+        _mem_pinned "$var" && { pinned=1; continue; }
+        h=$(( b100 * weight / sum ))
+        [[ "$h" -lt 1 ]] && h=1                                  # 0.00 = unlimited
+        plan="$plan $name:$h"
+        total=$(( total + h ))
+        if [[ "$h" -gt "$max_h" ]]; then max_h="$h"; max_name="$name"; fi
+    done
+    # Integer division leaves a few hundredths unassigned; spread them one at a
+    # time so the exported ceilings ADD UP to the declared budget without tilting
+    # the weights. Skipped when the operator pinned a value (the budget is then
+    # theirs to keep) and when the budget is too small for one hundredth per
+    # service (the 0.01 floor then wins, and the sum may exceed it).
+    local diff=0
+    if [[ "$pinned" -eq 0 && -n "$max_name" && "$b100" -ge "$n" ]]; then
+        diff=$(( b100 - total ))
+    fi
+    for spec in $plan; do
+        name="${spec%%:*}"; h="${spec##*:}"
+        if [[ "$diff" -gt 0 ]]; then h=$(( h + 1 )); diff=$(( diff - 1 )); fi
+        printf -v v '%d.%02d' $(( h / 100 )) $(( h % 100 ))
+        export "${name}_CPUS=$v"
+        _cpu_owned "${name}_CPUS"
+    done
+    return 0
+}
+
+# Remember a computed CPU cap so persist_memory_env can write it into the managed
+# block: without that a bare `docker compose up` falls back to the compose
+# defaults (8/10 cores), which the daemon rejects on a smaller machine.
+_cpu_owned() {
+    local var="$1" i
+    # Remember it as our own export, not an operator pin, so a second
+    # export_resource_caps in the same run recomputes instead of skipping.
+    _mem_self_exported "$var" || _MEM_SELF_EXPORTED="${_MEM_SELF_EXPORTED}${var} "
+    for i in "${_CPU_OWNED[@]:-}"; do [[ "$i" == "$var" ]] && return 0; done
+    _CPU_OWNED+=("$var")
+}
+
 export_cpu_caps() {
     [[ -z "${BUILD_NCPU:-}" ]] && detect_build_resources
+    # A declared budget is allocated by weight; without one, clamp each generous
+    # compose default to the detected core count (the #163 behavior).
+    allocate_cpu_budget && return 0
     _export_cpu_cap POSTGRES_CPUS 4
     _export_cpu_cap NEO4J_CPUS 8
     _export_cpu_cap KALI_CPUS 10
@@ -1094,6 +1201,12 @@ persist_memory_env() {
             # `${!var:-}` (never a bare `${!var}`): the caller runs under `set -u`,
             # so a var that vanished between the export and now must not abort the
             # whole command mid-write.
+            [[ -z "$var" || -z "${!var:-}" ]] && continue
+            printf '%s=%s\n' "$var" "${!var}"
+        done
+        # CPU caps allocated from a declared budget, same contract as the memory
+        # values above: written so a bare `docker compose up` gets the same split.
+        for var in "${_CPU_OWNED[@]:-}"; do
             [[ -z "$var" || -z "${!var:-}" ]] && continue
             printf '%s=%s\n' "$var" "${!var}"
         done

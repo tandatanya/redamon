@@ -674,6 +674,70 @@ Covered by [tests/redamon_env_block_test.sh](../../tests/redamon_env_block_test.
 which runs each scenario in a real subprocess and asserts the outcome through
 `docker compose config` rather than by inspecting the file.
 
+### 9.3 Declaring a host budget (a shared machine)
+
+Every percentage above is applied to the machine's *physical* size, which is
+wrong when the box also runs a desktop session, an IDE or another stack. Two
+optional keys declare the budget once:
+
+```bash
+REDAMON_HOST_RAM_MB=14336   # 14 GB of a 16 GB host
+REDAMON_HOST_CPUS=6         # 6 of 8 cores
+```
+
+They are read at the top of `detect_build_resources`, so every consumer sees the
+same budget: the allocator, `preflight_ram_gate`, `pick_parallelism` (build
+batching) and `export_cpu_caps`. A value above the detected machine is ignored --
+the budget can only lower what the host really has.
+
+Two behaviors change under a declared budget:
+
+- **Swap stops counting toward the burst cushion.** Without it, a host with
+  enough swap would be allowed ceilings that sum past the budget and quietly
+  reach it by paging. A declared budget is a hard budget.
+- **`REDAMON_HOST_CPUS` allocates instead of clamping.** Each always-on service
+  gets a weighted share of the budget (per-mille, in `_CPU_SPECS_BASE`, with a
+  `gvm`-profile extension), and the exported `cpus:` ceilings **sum to the
+  budget** -- the rounding hundredths included. A share below `0.01` is raised to
+  `0.01`, because compose passes `cpus` to Docker as `NanoCpus`, where `0` means
+  *unlimited*. Pinned per-service caps (`NEO4J_CPUS=...` outside the block) are
+  left alone, and the remainder is then not redistributed.
+
+Both the memory and the CPU results land in the managed `.env` block, so a bare
+`docker compose up` gets the same split as `./redamon.sh up`.
+
+The defaults for a 16 GB / 8-core host that keeps 2 GB and 2 cores for itself
+(what `.env` in the reference deployment uses):
+
+| Service | RAM ceiling | CPU ceiling |
+| --- | --- | --- |
+| neo4j | 1818m (heap 909m / pagecache 636m) | 0.99 |
+| postgres | 455m | 0.64 |
+| agent | 2239m | 0.94 |
+| webapp (prod) | 1627m | 0.74 |
+| kali-sandbox | 1027m | 0.64 |
+| recon-orchestrator | 613m | 0.30 |
+| docker-broker | 205m | 0.15 |
+| plugin-runner | 613m | 0.25 |
+| plugin-gateway | 128m | 0.05 |
+| capture-proxy | 408m | 0.15 |
+| traffic-ingest | 205m | 0.09 |
+| gvmd / ospd / redis / pg (GVM) | 1374m / 1125m / 912m / 513m | 0.29 / 0.59 / 0.09 / 0.09 |
+| **always-on total** | **~12.95 GB** | **6.00** |
+
+The eight one-shot GVM feed loaders (512m each) are excluded from that total by
+design: they only run during the first-boot/feed-update copy and exit before any
+scan is admitted. On a tight budget that copy is the one phase that can approach
+the cap, since page cache is charged to the cgroup.
+
+A spawned scan container is capped separately by the orchestrator
+(`PER_CONTAINER_CPUS`, `CONTAINER_CPU_FRACTION`); keep `PER_CONTAINER_CPUS` at or
+below a third of the budget so one scan cannot monopolize it.
+
+Covered by the "declared host budget" and "declared CPU budget" cases in
+[tests/redamon_governor_test.sh](../../tests/redamon_governor_test.sh).
+
+
 Every byte figure the governor relies on is meant to be *measured*, not guessed. The
 calibration harness uses the orchestrator's Docker SDK to sample real per-container memory
 and writes `resource_profile.json` (each value = `measured × (1 + MEM_SAFETY_TOLERANCE)`):

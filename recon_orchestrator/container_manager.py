@@ -456,6 +456,23 @@ def _env_size(name: str, default: str) -> str:
     return raw if raw else default
 
 
+def _env_nanocpus(name: str, default: str = "") -> Optional[int]:
+    """A Docker CPU ceiling (`nano_cpus`) from env, or None when unset/blank.
+
+    Same EMPTY-as-unset rule as _env_size: compose forwards `${VAR:-}`, and a
+    blank or malformed value must not become `nano_cpus=0`, which Docker reads as
+    UNLIMITED. Core shares come as decimals ("0.15"), so parse as float.
+    """
+    raw = (os.environ.get(name) or "").strip() or default
+    try:
+        cpus = float(raw)
+    except (TypeError, ValueError):
+        return None
+    if cpus <= 0:
+        return None
+    return int(cpus * 1_000_000_000)
+
+
 def _positive_int(value) -> Optional[int]:
     """`value` as a positive int, or None when absent, blank, malformed or not positive."""
     if isinstance(value, bool):
@@ -2124,6 +2141,9 @@ class ContainerManager:
             read_only=True,
             tmpfs={"/tmp": "size=64m,exec"},
             mem_limit=_env_size("CAPTURE_PROXY_MEM", "384m"),
+            # Declared-budget share (compose forwards ${CAPTURE_PROXY_CPUS:-}).
+            # None when no budget is declared, so the container stays uncapped.
+            nano_cpus=_env_nanocpus("CAPTURE_PROXY_CPUS"),
             pids_limit=256,
             restart_policy={"Name": "unless-stopped"},
             labels={"redamon.capture": "proxy"},
@@ -2164,6 +2184,7 @@ class ContainerManager:
             read_only=True,
             tmpfs={"/tmp": "size=64m,exec"},
             mem_limit=_env_size("TRAFFIC_INGEST_MEM", "256m"),
+            nano_cpus=_env_nanocpus("TRAFFIC_INGEST_CPUS"),
             pids_limit=256,
             restart_policy={"Name": "unless-stopped"},
             labels={"redamon.capture": "ingest"},

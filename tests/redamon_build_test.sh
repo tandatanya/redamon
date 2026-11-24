@@ -105,6 +105,10 @@ unset REDAMON_BUILD_PARALLEL
 assert_eq "no override -> detection (8GB->2)" "$(pick_parallelism)" "2"
 
 section "UNIT: detect_build_resources sources"
+# The operator's .env must not leak into detection: a declared host budget
+# (REDAMON_HOST_RAM_MB / REDAMON_HOST_CPUS) clamps exactly the values under test.
+# Point SCRIPT_DIR at an empty dir for this section, then restore it.
+_DETECT_TMP="$(mktemp -d)"; _DETECT_SCRIPT_DIR="$SCRIPT_DIR"; SCRIPT_DIR="$_DETECT_TMP"
 # Primary: docker info
 _docker_info_field() { case "$1" in MemTotal) echo 16777216000;; NCPU) echo 10;; esac; }
 detect_build_resources
@@ -126,6 +130,7 @@ detect_build_resources
 assert_eq "darwin fallback mem (32768MB)" "$BUILD_MEM_MB"     "32768"
 assert_eq "darwin fallback source"        "$BUILD_RES_SOURCE" "sysctl (host)"
 unset -f _docker_info_field uname sysctl
+SCRIPT_DIR="$_DETECT_SCRIPT_DIR"; rm -rf "$_DETECT_TMP"
 
 section "UNIT: maybe_warn_low_memory"
 _warn() { warn() { echo "$*"; }; }   # temporarily capture warn
